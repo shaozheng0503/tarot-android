@@ -1,4 +1,4 @@
-package com.tarot_android
+package com.tarot.android
 
 import android.app.Application
 import com.facebook.react.PackageList
