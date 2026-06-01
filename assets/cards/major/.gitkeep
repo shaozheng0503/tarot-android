@@ -1,0 +1,2 @@
+# 当前牌面使用 React Native 程序化渲染,无外部图片资源
+# 若需要切换为外部图片,可将图片放入此目录(major/)与 minor/{wands,cups,swords,pentacles}/
