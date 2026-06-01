@@ -14,6 +14,9 @@ interface Props {
 }
 
 export function SpreadLayout({ spreadType, drawn, faceUp, onCardPress }: Props) {
+  // 守卫:drawn 为空时(初次渲染 useEffect 未跑)直接返回
+  if (drawn.length === 0) return null;
+
   if (spreadType === 'single') {
     const d = drawn[0];
     const card = getCard(d.cardId);
