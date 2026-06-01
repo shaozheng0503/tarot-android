@@ -1,4 +1,5 @@
 // 牌阵布局:1 张居中 / 3 张横向
+// 翻牌错开:每张牌延迟 350ms 翻开
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { colors, fontSize, spacing } from '../theme/colors';
@@ -13,8 +14,9 @@ interface Props {
   onCardPress?: (idx: number) => void;
 }
 
+const FLIP_STAGGER_MS = 350;
+
 export function SpreadLayout({ spreadType, drawn, faceUp, onCardPress }: Props) {
-  // 守卫:drawn 为空时(初次渲染 useEffect 未跑)直接返回
   if (drawn.length === 0) return null;
 
   if (spreadType === 'single') {
@@ -29,6 +31,7 @@ export function SpreadLayout({ spreadType, drawn, faceUp, onCardPress }: Props) 
           orientation={d.orientation}
           faceUp={faceUp[0]}
           onPress={onCardPress ? () => onCardPress(0) : undefined}
+          flipDelay={0}
         />
       </View>
     );
@@ -49,6 +52,7 @@ export function SpreadLayout({ spreadType, drawn, faceUp, onCardPress }: Props) 
               faceUp={faceUp[idx]}
               onPress={onCardPress ? () => onCardPress(idx) : undefined}
               small
+              flipDelay={idx * FLIP_STAGGER_MS}
             />
           </View>
         );

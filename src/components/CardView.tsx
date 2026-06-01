@@ -1,7 +1,16 @@
-// 牌面:程序化渲染(无图片依赖)
-// 显示: 顶部花色符号 + 牌名 + 牌号 + 中央符号 + 底部解读预览
-import React from 'react';
+// 牌面 + 牌背:3D 翻牌动画(rotateY 0→180°)
+// 翻牌瞬间附带光晕闪烁(scale + opacity 闪光)
+import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, ViewStyle, Pressable } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withSequence,
+  withDelay,
+  Easing,
+  withSpring,
+} from 'react-native-reanimated';
 import { colors, getSuitColor, radius, fontSize, spacing } from '../theme/colors';
 import type { TarotCard, Orientation } from '../types';
 import { CardBack } from './CardBack';
@@ -13,81 +22,164 @@ interface Props {
   onPress?: () => void;
   small?: boolean;
   style?: ViewStyle;
+  /** 翻牌延迟(ms),用于多张牌依次翻开 */
+  flipDelay?: number;
 }
 
-export function CardView({ card, orientation, faceUp, onPress, small, style }: Props) {
+const NORMAL = { w: 120, h: 200 };
+const SMALL = { w: 80, h: 130 };
+
+export function CardView({ card, orientation, faceUp, onPress, small, style, flipDelay = 0 }: Props) {
+  const dim = small ? SMALL : NORMAL;
   const isReversed = orientation === 'reversed';
   const accent = getSuitColor(card.suit);
 
-  if (!faceUp) {
-    return (
-      <Pressable onPress={onPress} disabled={!onPress}>
-        <CardBack style={style} small={small} />
-      </Pressable>
-    );
-  }
+  // 翻牌角度:0 = 牌背,180 = 牌面
+  const rotation = useSharedValue(faceUp ? 180 : 0);
+  // 闪光效果:翻牌瞬间 0 → 1 → 0
+  const flash = useSharedValue(0);
+  // 入场:scale 0.6 → 1
+  const appear = useSharedValue(0);
 
-  const dim = small ? styles.cardSmall : styles.cardNormal;
+  useEffect(() => {
+    // 入场动画
+    appear.value = withDelay(
+      flipDelay,
+      withSpring(1, { damping: 12, stiffness: 180, mass: 0.6 }),
+    );
+  }, [flipDelay, appear]);
+
+  useEffect(() => {
+    if (faceUp) {
+      // 翻牌(延迟以错开)
+      rotation.value = withDelay(
+        flipDelay,
+        withTiming(180, { duration: 800, easing: Easing.inOut(Easing.cubic) }),
+      );
+      // 翻完瞬间闪光
+      flash.value = withDelay(
+        flipDelay + 400,
+        withSequence(
+          withTiming(1, { duration: 250, easing: Easing.out(Easing.cubic) }),
+          withTiming(0, { duration: 500, easing: Easing.in(Easing.cubic) }),
+        ),
+      );
+    } else {
+      rotation.value = withTiming(0, { duration: 400 });
+    }
+  }, [faceUp, flipDelay, rotation, flash]);
+
+  const wrapperStyle = useAnimatedStyle(() => ({
+    transform: [
+      { perspective: 1200 },
+      { rotateY: `${rotation.value}deg` },
+      { scale: 0.85 + appear.value * 0.15 },
+    ],
+    opacity: appear.value,
+  }));
+
+  const flashStyle = useAnimatedStyle(() => ({
+    opacity: flash.value * 0.85,
+  }));
+
   return (
     <Pressable
       onPress={onPress}
       disabled={!onPress}
       style={({ pressed }) => [
-        styles.card,
-        dim,
-        { borderColor: accent },
-        pressed && onPress ? { transform: [{ scale: 0.97 }] } : null,
+        { width: dim.w, height: dim.h },
+        pressed && onPress ? { transform: [{ scale: 0.95 }] } : null,
         style,
       ]}
     >
-      {/* 顶部条:符号 + 牌名 */}
-      <View style={styles.topRow}>
-        <Text style={[styles.symbol, small && styles.symbolSmall, { color: accent }]}>
-          {card.symbol}
-        </Text>
-        <View style={styles.nameWrap}>
-          <Text style={[styles.nameZh, small && styles.nameZhSmall]} numberOfLines={1}>
-            {card.nameZh}
-          </Text>
-          {!small && (
-            <Text style={styles.nameEn} numberOfLines={1}>{card.nameEn}</Text>
-          )}
+      <Animated.View style={[styles.flipWrap, { width: dim.w, height: dim.h }, wrapperStyle]}>
+        {/* 牌背(rotation 0) */}
+        <View style={[styles.face, styles.absolute]}>
+          <CardBack small={small} />
         </View>
-        <Text style={[styles.symbol, small && styles.symbolSmall, { color: accent }]}>
-          {card.symbol}
-        </Text>
-      </View>
 
-      {/* 牌号 */}
-      <Text style={[styles.number, small && styles.numberSmall, { color: accent }]}>
-        {card.arcana === 'major' ? card.number : `${card.number}`}
-      </Text>
+        {/* 牌面(rotation 180) */}
+        <View style={[styles.face, styles.absolute, { transform: [{ rotateY: '180deg' }] }]}>
+          <View style={[styles.card, small ? styles.cardSmall : styles.cardNormal, { borderColor: accent }]}>
+            {/* 顶部条:符号 + 牌名 */}
+            <View style={styles.topRow}>
+              <Text style={[styles.symbol, small && styles.symbolSmall, { color: accent }]}>
+                {card.symbol}
+              </Text>
+              <View style={styles.nameWrap}>
+                <Text style={[styles.nameZh, small && styles.nameZhSmall]} numberOfLines={1}>
+                  {card.nameZh}
+                </Text>
+                {!small && (
+                  <Text style={styles.nameEn} numberOfLines={1}>{card.nameEn}</Text>
+                )}
+              </View>
+              <Text style={[styles.symbol, small && styles.symbolSmall, { color: accent }]}>
+                {card.symbol}
+              </Text>
+            </View>
 
-      {/* 中央主符号 */}
-      <View style={styles.centerSymbol}>
-        <Text
+            {/* 牌号 */}
+            <Text style={[styles.number, small && styles.numberSmall, { color: accent }]}>
+              {card.arcana === 'major' ? card.number : `${card.number}`}
+            </Text>
+
+            {/* 中央主符号 */}
+            <View style={styles.centerSymbol}>
+              <Text
+                style={[
+                  styles.bigSymbol,
+                  small && styles.bigSymbolSmall,
+                  { color: accent, textShadowColor: accent },
+                ]}
+              >
+                {card.symbol}
+              </Text>
+            </View>
+
+            {/* 底部条:正/逆位标记 */}
+            <View style={styles.bottomRow}>
+              <Text style={[styles.orientation, isReversed && { color: colors.reversed }]}>
+                {isReversed ? '✦ 逆位 ✦' : '✦ 正位 ✦'}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* 翻牌闪光层(覆盖在牌面之上) */}
+        <Animated.View
+          pointerEvents="none"
           style={[
-            styles.bigSymbol,
-            small && styles.bigSymbolSmall,
-            { color: accent, textShadowColor: accent },
+            styles.absolute,
+            styles.flashLayer,
+            flashStyle,
           ]}
-        >
-          {card.symbol}
-        </Text>
-      </View>
-
-      {/* 底部条:正/逆位标记 */}
-      <View style={styles.bottomRow}>
-        <Text style={[styles.orientation, isReversed && { color: colors.reversed }]}>
-          {isReversed ? '✦ 逆位 ✦' : '✦ 正位 ✦'}
-        </Text>
-      </View>
+        />
+      </Animated.View>
     </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
+  flipWrap: {
+    position: 'relative',
+  },
+  face: {
+    backfaceVisibility: 'hidden',
+  },
+  absolute: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  flashLayer: {
+    backgroundColor: '#fff8e7',
+    borderRadius: radius.card,
+  },
   card: {
+    flex: 1,
     backgroundColor: colors.bgCard,
     borderRadius: radius.card,
     borderWidth: 2,
@@ -99,12 +191,12 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   cardNormal: {
-    width: 120,
-    height: 200,
+    width: '100%',
+    height: '100%',
   },
   cardSmall: {
-    width: 80,
-    height: 130,
+    width: '100%',
+    height: '100%',
   },
   topRow: {
     flexDirection: 'row',
