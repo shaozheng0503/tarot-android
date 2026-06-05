@@ -11,6 +11,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { CardBack } from './CardBack';
 import { colors } from '../theme/colors';
+import { useReduceMotion } from '../hooks/useReduceMotion';
 
 interface Props {
   active: boolean;
@@ -18,6 +19,7 @@ interface Props {
 }
 
 const SHUFFLE_DURATION = 2000;
+const SHUFFLE_DURATION_REDUCED = 400; // 减少动效时仅做短暂停顿
 const NUM_CARDS = 5;
 
 type CardState = { x: number; y: number; rot: number; scale: number };
@@ -31,6 +33,7 @@ export function ShuffleDeck({ active, onComplete }: Props) {
   const s4 = useSharedValue<CardState>({ x: 0, y: 0, rot: 0, scale: 1 });
   const states = [s0, s1, s2, s3, s4];
   const opacity = useSharedValue(0);
+  const reduceMotion = useReduceMotion();
 
   useEffect(() => {
     if (!active) {
@@ -38,6 +41,14 @@ export function ShuffleDeck({ active, onComplete }: Props) {
       states.forEach(t => { t.value = { x: 0, y: 0, rot: 0, scale: 1 }; });
       return;
     }
+
+    // 减少动效:静态显示牌堆,短暂停顿后直接进入翻牌
+    if (reduceMotion) {
+      opacity.value = 1;
+      const t = setTimeout(() => onComplete?.(), SHUFFLE_DURATION_REDUCED);
+      return () => clearTimeout(t);
+    }
+
     opacity.value = withTiming(1, { duration: 200 });
 
     states.forEach((t, i) => {
@@ -74,7 +85,7 @@ export function ShuffleDeck({ active, onComplete }: Props) {
     }, SHUFFLE_DURATION);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active]);
+  }, [active, reduceMotion]);
 
   const wrapStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,

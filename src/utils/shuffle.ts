@@ -13,11 +13,14 @@ export function shuffle<T>(arr: readonly T[]): T[] {
   return a;
 }
 
+/** 逆位出现概率(传统占卜常取 30% 左右,而非对半) */
+export const REVERSED_PROBABILITY = 0.3;
+
 /**
  * 独立判定每张牌的正逆位
  */
 export function rollOrientation(): Orientation {
-  return Math.random() < 0.5 ? 'upright' : 'reversed';
+  return Math.random() < REVERSED_PROBABILITY ? 'reversed' : 'upright';
 }
 
 /**

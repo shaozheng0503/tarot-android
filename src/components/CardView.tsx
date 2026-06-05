@@ -14,6 +14,7 @@ import Animated, {
 import { colors, getSuitColor, radius, fontSize, spacing } from '../theme/colors';
 import type { TarotCard, Orientation } from '../types';
 import { CardBack } from './CardBack';
+import { useReduceMotion } from '../hooks/useReduceMotion';
 
 interface Props {
   card: TarotCard;
@@ -21,6 +22,8 @@ interface Props {
   faceUp: boolean;
   onPress?: () => void;
   small?: boolean;
+  /** 更小的尺寸,用于 5 张以上的网格牌阵 */
+  tiny?: boolean;
   style?: ViewStyle;
   /** 翻牌延迟(ms),用于多张牌依次翻开 */
   flipDelay?: number;
@@ -28,11 +31,18 @@ interface Props {
 
 const NORMAL = { w: 120, h: 200 };
 const SMALL = { w: 80, h: 130 };
+const TINY = { w: 62, h: 102 };
 
-export function CardView({ card, orientation, faceUp, onPress, small, style, flipDelay = 0 }: Props) {
-  const dim = small ? SMALL : NORMAL;
+export function CardView({ card, orientation, faceUp, onPress, small, tiny, style, flipDelay = 0 }: Props) {
+  const dim = tiny ? TINY : small ? SMALL : NORMAL;
+  const compact = small || tiny;
   const isReversed = orientation === 'reversed';
   const accent = getSuitColor(card.suit);
+  const reduceMotion = useReduceMotion();
+
+  const a11yLabel = faceUp
+    ? `${card.nameZh},${isReversed ? '逆位' : '正位'},元素${card.element}${card.astro ? `,${card.astro}` : ''}`
+    : '未翻开的塔罗牌';
 
   // 翻牌角度:0 = 牌背,180 = 牌面
   const rotation = useSharedValue(faceUp ? 180 : 0);
@@ -42,14 +52,24 @@ export function CardView({ card, orientation, faceUp, onPress, small, style, fli
   const appear = useSharedValue(0);
 
   useEffect(() => {
-    // 入场动画
+    // 入场动画(减少动效时直接到位)
+    if (reduceMotion) {
+      appear.value = 1;
+      return;
+    }
     appear.value = withDelay(
       flipDelay,
       withSpring(1, { damping: 12, stiffness: 180, mass: 0.6 }),
     );
-  }, [flipDelay, appear]);
+  }, [flipDelay, appear, reduceMotion]);
 
   useEffect(() => {
+    // 减少动效:直接定位,不播放翻牌与闪光
+    if (reduceMotion) {
+      rotation.value = faceUp ? 180 : 0;
+      flash.value = 0;
+      return;
+    }
     if (faceUp) {
       // 翻牌(延迟以错开)
       rotation.value = withDelay(
@@ -67,7 +87,7 @@ export function CardView({ card, orientation, faceUp, onPress, small, style, fli
     } else {
       rotation.value = withTiming(0, { duration: 400 });
     }
-  }, [faceUp, flipDelay, rotation, flash]);
+  }, [faceUp, flipDelay, rotation, flash, reduceMotion]);
 
   const wrapperStyle = useAnimatedStyle(() => ({
     transform: [
@@ -86,6 +106,9 @@ export function CardView({ card, orientation, faceUp, onPress, small, style, fli
     <Pressable
       onPress={onPress}
       disabled={!onPress}
+      accessible
+      accessibilityRole={onPress ? 'button' : 'image'}
+      accessibilityLabel={a11yLabel}
       style={({ pressed }) => [
         { width: dim.w, height: dim.h },
         pressed && onPress ? { transform: [{ scale: 0.95 }] } : null,
@@ -95,32 +118,32 @@ export function CardView({ card, orientation, faceUp, onPress, small, style, fli
       <Animated.View style={[styles.flipWrap, { width: dim.w, height: dim.h }, wrapperStyle]}>
         {/* 牌背(rotation 0) */}
         <View style={[styles.face, styles.absolute]}>
-          <CardBack small={small} />
+          <CardBack small={compact} />
         </View>
 
         {/* 牌面(rotation 180) */}
         <View style={[styles.face, styles.absolute, { transform: [{ rotateY: '180deg' }] }]}>
-          <View style={[styles.card, small ? styles.cardSmall : styles.cardNormal, { borderColor: accent }]}>
+          <View style={[styles.card, { borderColor: accent }]}>
             {/* 顶部条:符号 + 牌名 */}
             <View style={styles.topRow}>
-              <Text style={[styles.symbol, small && styles.symbolSmall, { color: accent }]}>
+              <Text style={[styles.symbol, compact && styles.symbolSmall, { color: accent }]}>
                 {card.symbol}
               </Text>
               <View style={styles.nameWrap}>
-                <Text style={[styles.nameZh, small && styles.nameZhSmall]} numberOfLines={1}>
+                <Text style={[styles.nameZh, compact && styles.nameZhSmall]} numberOfLines={1}>
                   {card.nameZh}
                 </Text>
-                {!small && (
+                {!compact && (
                   <Text style={styles.nameEn} numberOfLines={1}>{card.nameEn}</Text>
                 )}
               </View>
-              <Text style={[styles.symbol, small && styles.symbolSmall, { color: accent }]}>
+              <Text style={[styles.symbol, compact && styles.symbolSmall, { color: accent }]}>
                 {card.symbol}
               </Text>
             </View>
 
             {/* 牌号 */}
-            <Text style={[styles.number, small && styles.numberSmall, { color: accent }]}>
+            <Text style={[styles.number, compact && styles.numberSmall, { color: accent }]}>
               {card.arcana === 'major' ? card.number : `${card.number}`}
             </Text>
 
@@ -129,13 +152,21 @@ export function CardView({ card, orientation, faceUp, onPress, small, style, fli
               <Text
                 style={[
                   styles.bigSymbol,
-                  small && styles.bigSymbolSmall,
+                  compact && styles.bigSymbolSmall,
+                  tiny && styles.bigSymbolTiny,
                   { color: accent, textShadowColor: accent },
                 ]}
               >
                 {card.symbol}
               </Text>
             </View>
+
+            {/* 元素 / 占星(仅正常尺寸展示,避免小牌拥挤) */}
+            {!compact && (
+              <Text style={[styles.astro, { color: accent }]} numberOfLines={1}>
+                {card.element}{card.astro ? ` · ${card.astro}` : ''}
+              </Text>
+            )}
 
             {/* 底部条:正/逆位标记 */}
             <View style={styles.bottomRow}>
@@ -180,6 +211,8 @@ const styles = StyleSheet.create({
   },
   card: {
     flex: 1,
+    width: '100%',
+    height: '100%',
     backgroundColor: colors.bgCard,
     borderRadius: radius.card,
     borderWidth: 2,
@@ -189,14 +222,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.5,
     shadowRadius: 8,
     elevation: 8,
-  },
-  cardNormal: {
-    width: '100%',
-    height: '100%',
-  },
-  cardSmall: {
-    width: '100%',
-    height: '100%',
   },
   topRow: {
     flexDirection: 'row',
@@ -214,7 +239,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   nameZhSmall: {
-    fontSize: fontSize.body,
+    fontSize: fontSize.caption,
   },
   nameEn: {
     color: colors.textMuted,
@@ -225,7 +250,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
   },
   symbolSmall: {
-    fontSize: 14,
+    fontSize: 12,
   },
   number: {
     fontSize: fontSize.body,
@@ -234,7 +259,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   numberSmall: {
-    fontSize: fontSize.caption,
+    fontSize: 10,
     marginTop: 0,
   },
   centerSymbol: {
@@ -243,13 +268,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   bigSymbol: {
-    fontSize: 64,
+    fontSize: 56,
     textShadowOffset: { width: 0, height: 0 },
     textShadowRadius: 12,
   },
   bigSymbolSmall: {
-    fontSize: 36,
+    fontSize: 34,
     textShadowRadius: 8,
+  },
+  bigSymbolTiny: {
+    fontSize: 26,
+    textShadowRadius: 6,
+  },
+  astro: {
+    fontSize: 10,
+    textAlign: 'center',
+    marginBottom: 2,
+    letterSpacing: 0.5,
   },
   bottomRow: {
     alignItems: 'center',

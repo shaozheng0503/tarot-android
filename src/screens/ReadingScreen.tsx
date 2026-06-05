@@ -1,4 +1,4 @@
-// ReadingScreen: 抽牌 + 翻牌动画 + 解读展示 + 保存历史
+// ReadingScreen: 抽牌 + 翻牌动画 + 解读展示 + 保存历史 + 复制/分享
 import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Pressable,
@@ -9,16 +9,22 @@ import HapticFeedback from 'react-native-haptic-feedback';
 import { colors, fontSize, radius, spacing } from '../theme/colors';
 import { drawCards } from '../utils/shuffle';
 import { genId } from '../utils/uuid';
-import { ALL_CARDS, getCard } from '../data/cards';
+import { formatReadingText } from '../utils/formatReading';
+import { ALL_CARDS } from '../data/cards';
 import { getSpread } from '../data/spreads';
 import { ShuffleDeck } from '../components/ShuffleDeck';
 import { SpreadLayout } from '../components/SpreadLayout';
+import { Interpretation } from '../components/Interpretation';
+import { ShareActions } from '../components/ShareActions';
 import { useHistoryStore } from '../store/useHistoryStore';
 import type { DrawnCard, RootStackParamList, HistoryEntry } from '../types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Reading'>;
 
 type Phase = 'idle' | 'shuffling' | 'revealing' | 'done';
+
+const REVEAL_LEAD_MS = 250;     // 第一张翻开前的留白
+const REVEAL_TAIL_MS = 500;     // 最后一张翻完到进入 done 的缓冲
 
 export function ReadingScreen({ route, navigation }: Props) {
   const { spreadType, question } = route.params;
@@ -43,27 +49,25 @@ export function ReadingScreen({ route, navigation }: Props) {
     HapticFeedback.trigger('impactMedium');
   };
 
-  // 洗牌完成 → 逐张翻牌
+  // 洗牌完成 → 依次翻牌(由 CardView 的 flipDelay 形成瀑布,这里只负责触感与收尾)
   const onShuffleComplete = () => {
     setPhase('revealing');
     const cards = drawnRef.current;
+    const stagger = cards.length > 5 ? 200 : 400;
+    // 先让牌阵以"牌背"挂载,下一帧再统一翻开,确保翻牌动画完整播放
+    const FLIP_START = 80;
+    setTimeout(() => setFaceUp(cards.map(() => true)), FLIP_START);
     cards.forEach((_, idx) => {
-      setTimeout(() => {
-        setFaceUp(prev => {
-          const next = [...prev];
-          next[idx] = true;
-          return next;
-        });
-        HapticFeedback.trigger('selection');
-      }, 250 + idx * 400);
+      setTimeout(
+        () => HapticFeedback.trigger('selection'),
+        FLIP_START + REVEAL_LEAD_MS + idx * stagger,
+      );
     });
-    // 最后一张翻完 → done
     setTimeout(() => {
       setPhase('done');
       HapticFeedback.trigger('notificationSuccess');
-      // 自动保存
       if (cards.length > 0) saveReading(cards);
-    }, 250 + cards.length * 400 + 300);
+    }, FLIP_START + REVEAL_LEAD_MS + cards.length * stagger + REVEAL_TAIL_MS);
   };
 
   const saveReading = (cardsToSave: DrawnCard[]) => {
@@ -84,6 +88,14 @@ export function ReadingScreen({ route, navigation }: Props) {
     startReading();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const buildShareText = () =>
+    formatReadingText({
+      spreadType,
+      question,
+      cards: drawnRef.current,
+      timestamp: startTimeRef.current || undefined,
+    });
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
@@ -117,50 +129,15 @@ export function ReadingScreen({ route, navigation }: Props) {
             spreadType={spreadType}
             drawn={drawn}
             faceUp={faceUp}
-            onCardPress={idx => {
-              // 允许点击未翻开的牌提前翻开
-              if (!faceUp[idx] && phase === 'revealing') {
-                setFaceUp(prev => {
-                  const next = [...prev];
-                  next[idx] = true;
-                  return next;
-                });
-              }
-            }}
           />
         )}
 
         {/* 解读区 */}
         {phase === 'done' && drawn.length > 0 && (
           <View style={styles.interpretSection}>
-            {drawn.map((d, idx) => {
-              const card = getCard(d.cardId);
-              if (!card) return null;
-              const isR = d.orientation === 'reversed';
-              return (
-                <View key={idx} style={styles.interpretCard}>
-                  <View style={styles.interpretHeader}>
-                    <Text style={styles.interpretName}>
-                      {d.position && <Text style={styles.interpretPosition}>{d.position} · </Text>}
-                      {card.nameZh}
-                    </Text>
-                    <Text style={[styles.interpretOrient, isR && styles.interpretOrientR]}>
-                      {isR ? '逆位' : '正位'}
-                    </Text>
-                  </View>
-                  <View style={styles.kwRow}>
-                    {(isR ? card.keywordsReversed : card.keywordsUpright).map((kw, i) => (
-                      <View key={i} style={styles.kwChip}>
-                        <Text style={styles.kwText}>{kw}</Text>
-                      </View>
-                    ))}
-                  </View>
-                  <Text style={styles.interpretText}>
-                    {isR ? card.meaningReversed : card.meaningUpright}
-                  </Text>
-                </View>
-              );
-            })}
+            <Interpretation drawn={drawn} />
+
+            <ShareActions getText={buildShareText} />
 
             {savedId && (
               <Text style={styles.savedHint}>已自动保存到历史记录 ✦</Text>
@@ -225,66 +202,11 @@ const styles = StyleSheet.create({
   interpretSection: {
     marginTop: spacing.lg,
   },
-  interpretCard: {
-    backgroundColor: colors.bgCard,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    marginBottom: spacing.md,
-    borderLeftWidth: 3,
-    borderLeftColor: colors.gold,
-  },
-  interpretHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  interpretName: {
-    color: colors.textPrimary,
-    fontSize: fontSize.bodyLarge,
-    fontWeight: '700',
-  },
-  interpretPosition: {
-    color: colors.gold,
-    fontWeight: '600',
-  },
-  interpretOrient: {
-    color: colors.gold,
-    fontSize: fontSize.caption,
-    fontWeight: '600',
-  },
-  interpretOrientR: {
-    color: colors.reversed,
-  },
-  kwRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: spacing.sm,
-  },
-  kwChip: {
-    backgroundColor: colors.bgDeep,
-    borderRadius: radius.sm,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    marginRight: spacing.xs,
-    marginBottom: spacing.xs,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  kwText: {
-    color: colors.goldBright,
-    fontSize: fontSize.caption,
-  },
-  interpretText: {
-    color: colors.textPrimary,
-    fontSize: fontSize.body,
-    lineHeight: 22,
-  },
   savedHint: {
     color: colors.gold,
     fontSize: fontSize.caption,
     textAlign: 'center',
-    marginTop: spacing.sm,
+    marginTop: spacing.md,
     letterSpacing: 1,
   },
   actionRow: {

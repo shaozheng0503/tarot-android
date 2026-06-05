@@ -8,6 +8,7 @@
 //                  15恶魔♂ 16塔☿ 17星星☉ 18月亮☽ 19太阳☉ 20审判♄ 21世界♃
 
 import type { TarotCard, Suit, SuitSymbol } from '../types';
+import { SUIT_ELEMENT, MAJOR_CORRESPONDENCE } from './correspondences';
 
 // 小阿卡纳符号约定
 const WAND: SuitSymbol = '☉';   // 权杖 - 火
@@ -332,19 +333,26 @@ const PENTACLES = makeMinor('pentacles', '星币', PENT,
   ['物质', '身体'], ['匮乏', '失衡'], PENTACLES_RANKS);
 
 export const ALL_CARDS: TarotCard[] = [...MAJOR, ...WANDS, ...CUPS, ...SWORDS, ...PENTACLES]
-  .map((c): TarotCard => ({
-    id: c.id,
-    arcana: c.id.startsWith('major-') ? 'major' : 'minor',
-    suit: c.id.startsWith('major-') ? undefined : c.id.split('-')[0] as Suit,
-    number: c.number,
-    nameEn: c.nameEn,
-    nameZh: c.nameZh,
-    keywordsUpright: c.keywordsU,
-    keywordsReversed: c.keywordsR,
-    meaningUpright: c.meaningU,
-    meaningReversed: c.meaningR,
-    symbol: c.symbol,
-  }));
+  .map((c): TarotCard => {
+    const isMajor = c.id.startsWith('major-');
+    const suit = isMajor ? undefined : (c.id.split('-')[0] as Suit);
+    const major = isMajor ? MAJOR_CORRESPONDENCE[c.number] : undefined;
+    return {
+      id: c.id,
+      arcana: isMajor ? 'major' : 'minor',
+      suit,
+      number: c.number,
+      nameEn: c.nameEn,
+      nameZh: c.nameZh,
+      keywordsUpright: c.keywordsU,
+      keywordsReversed: c.keywordsR,
+      meaningUpright: c.meaningU,
+      meaningReversed: c.meaningR,
+      symbol: c.symbol,
+      element: major ? major.element : SUIT_ELEMENT[suit as Suit],
+      astro: major ? major.astro : '',
+    };
+  });
 
 export const CARDS_BY_ID: Record<string, TarotCard> =
   ALL_CARDS.reduce((acc, c) => { acc[c.id] = c; return acc; }, {} as Record<string, TarotCard>);
@@ -352,3 +360,12 @@ export const CARDS_BY_ID: Record<string, TarotCard> =
 export function getCard(id: string): TarotCard | undefined {
   return CARDS_BY_ID[id];
 }
+
+/** 图鉴分组:大阿卡纳 + 四花色 */
+export const CARD_GROUPS: { title: string; cards: TarotCard[] }[] = [
+  { title: '大阿卡纳', cards: ALL_CARDS.filter(c => c.arcana === 'major') },
+  { title: '权杖 · 火', cards: ALL_CARDS.filter(c => c.suit === 'wands') },
+  { title: '圣杯 · 水', cards: ALL_CARDS.filter(c => c.suit === 'cups') },
+  { title: '宝剑 · 风', cards: ALL_CARDS.filter(c => c.suit === 'swords') },
+  { title: '星币 · 土', cards: ALL_CARDS.filter(c => c.suit === 'pentacles') },
+];

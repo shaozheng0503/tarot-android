@@ -14,26 +14,30 @@ import Animated, {
   withDelay,
   withSpring,
   Easing,
-  interpolate,
 } from 'react-native-reanimated';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { colors, fontSize, radius, spacing } from '../theme/colors';
-import { SPREADS } from '../data/spreads';
-import type { RootStackParamList, MainTabParamList } from '../types';
+import { SPREADS, SPREAD_ORDER } from '../data/spreads';
+import { DailyBanner } from '../components/DailyBanner';
+import { useReduceMotion } from '../hooks/useReduceMotion';
+import type { RootStackParamList, MainTabParamList, SpreadType } from '../types';
 
 type Props = CompositeScreenProps<
   BottomTabScreenProps<MainTabParamList, 'HomeTab'>,
   NativeStackScreenProps<RootStackParamList>
 >;
 
-const ROMAN: Record<number, string> = { 1: 'I', 2: 'II', 3: 'III', 4: 'IV', 5: 'V' };
+const ROMAN: Record<number, string> = {
+  1: 'I', 2: 'II', 3: 'III', 4: 'IV', 5: 'V',
+  6: 'VI', 7: 'VII', 8: 'VIII', 9: 'IX', 10: 'X',
+};
 
 export function HomeScreen({ navigation }: Props) {
   const [question, setQuestion] = useState('');
 
-  const handleStart = (spreadType: 'single' | 'three-card') => {
+  const handleStart = (spreadType: SpreadType) => {
     navigation.navigate('Reading', {
       spreadType,
       question: question.trim() || undefined,
@@ -56,6 +60,10 @@ export function HomeScreen({ navigation }: Props) {
 
           <AnimatedEntry delay={300}>
             <Text style={styles.tagline}>让 直 觉 为 你 揭 晓 答 案</Text>
+          </AnimatedEntry>
+
+          <AnimatedEntry delay={400}>
+            <DailyBanner onPress={() => navigation.navigate('Daily')} />
           </AnimatedEntry>
 
           <AnimatedEntry delay={450}>
@@ -92,19 +100,22 @@ export function HomeScreen({ navigation }: Props) {
             </View>
           </AnimatedEntry>
 
-          {(Object.values(SPREADS)).map((spread, idx) => (
-            <AnimatedEntry key={spread.type} delay={750 + idx * 150}>
-              <SpreadCard
-                roman={ROMAN[spread.cardCount] || String(spread.cardCount)}
-                name={spread.nameZh}
-                badge={`${spread.cardCount} 张`}
-                description={spread.description}
-                onPress={() => handleStart(spread.type)}
-              />
-            </AnimatedEntry>
-          ))}
+          {SPREAD_ORDER.map((type, idx) => {
+            const spread = SPREADS[type];
+            return (
+              <AnimatedEntry key={spread.type} delay={750 + idx * 120}>
+                <SpreadCard
+                  roman={ROMAN[spread.cardCount] || String(spread.cardCount)}
+                  name={spread.nameZh}
+                  badge={`${spread.cardCount} 张`}
+                  description={spread.description}
+                  onPress={() => handleStart(spread.type)}
+                />
+              </AnimatedEntry>
+            );
+          })}
 
-          <AnimatedEntry delay={1100}>
+          <AnimatedEntry delay={1500}>
             <View style={styles.footerRow}>
               <View style={styles.divider} />
               <Text style={styles.footer}>78 张全牌库 · 正逆位 · 解读内置</Text>
@@ -122,8 +133,14 @@ function BreathingLogo() {
   const breath = useSharedValue(0);
   const haloRot = useSharedValue(0);
   const appear = useSharedValue(0);
+  const reduceMotion = useReduceMotion();
 
   useEffect(() => {
+    if (reduceMotion) {
+      appear.value = 1;
+      breath.value = 0.5;
+      return;
+    }
     appear.value = withTiming(1, { duration: 800 });
     breath.value = withRepeat(
       withSequence(
@@ -138,7 +155,7 @@ function BreathingLogo() {
       -1,
       false,
     );
-  }, [appear, breath, haloRot]);
+  }, [appear, breath, haloRot, reduceMotion]);
 
   const centerStyle = useAnimatedStyle(() => ({
     transform: [
@@ -196,12 +213,17 @@ function BreathingLogo() {
 // 入场动画包装器:从下方渐入
 function AnimatedEntry({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
   const t = useSharedValue(0);
+  const reduceMotion = useReduceMotion();
   useEffect(() => {
+    if (reduceMotion) {
+      t.value = 1;
+      return;
+    }
     t.value = withDelay(
       delay,
       withSpring(1, { damping: 14, stiffness: 100, mass: 0.8 }),
     );
-  }, [delay, t]);
+  }, [delay, t, reduceMotion]);
   const style = useAnimatedStyle(() => ({
     opacity: t.value,
     transform: [{ translateY: (1 - t.value) * 20 }],

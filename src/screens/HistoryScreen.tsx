@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
-import { colors, fontSize, radius, spacing } from '../theme/colors';
+import { colors, fontSize, spacing } from '../theme/colors';
 import { useHistoryStore } from '../store/useHistoryStore';
 import { HistoryItem } from '../components/HistoryItem';
 import type { RootStackParamList, MainTabParamList } from '../types';
@@ -20,12 +20,20 @@ type Props = CompositeScreenProps<
 export function HistoryScreen({ navigation }: Props) {
   const history = useHistoryStore(s => s.history);
   const clear = useHistoryStore(s => s.clear);
+  const removeEntry = useHistoryStore(s => s.removeEntry);
 
   const handleClear = () => {
     if (history.length === 0) return;
     Alert.alert('清空历史', '确定要清空所有历史记录吗?此操作不可恢复。', [
       { text: '取消', style: 'cancel' },
       { text: '清空', style: 'destructive', onPress: () => clear() },
+    ]);
+  };
+
+  const handleDelete = (id: string) => {
+    Alert.alert('删除记录', '确定要删除这条记录吗?', [
+      { text: '取消', style: 'cancel' },
+      { text: '删除', style: 'destructive', onPress: () => removeEntry(id) },
     ]);
   };
 
@@ -49,10 +57,14 @@ export function HistoryScreen({ navigation }: Props) {
         <FlatList
           data={history}
           keyExtractor={item => item.id}
+          ListHeaderComponent={
+            <Text style={styles.hint}>长按任意记录可删除</Text>
+          }
           renderItem={({ item }) => (
             <HistoryItem
               entry={item}
               onPress={() => navigation.navigate('HistoryDetail', { entryId: item.id })}
+              onLongPress={() => handleDelete(item.id)}
             />
           )}
           contentContainerStyle={styles.list}
@@ -85,6 +97,12 @@ const styles = StyleSheet.create({
   list: {
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xxl,
+  },
+  hint: {
+    color: colors.textMuted,
+    fontSize: fontSize.caption,
+    textAlign: 'center',
+    marginBottom: spacing.sm,
   },
   empty: {
     flex: 1,
