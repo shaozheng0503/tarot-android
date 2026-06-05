@@ -4,10 +4,12 @@ import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { colors, fontSize, radius, spacing } from '../theme/colors';
 import type { HistoryEntry } from '../types';
 import { getCard } from '../data/cards';
+import { getSpread } from '../data/spreads';
 
 interface Props {
   entry: HistoryEntry;
   onPress: () => void;
+  onLongPress?: () => void;
 }
 
 function formatDate(ts: number): string {
@@ -20,8 +22,10 @@ function formatDate(ts: number): string {
   return `${y}-${m}-${day} ${hh}:${mm}`;
 }
 
-export function HistoryItem({ entry, onPress }: Props) {
-  const spreadLabel = entry.spreadType === 'single' ? '单牌指引' : '三牌阵';
+export function HistoryItem({ entry, onPress, onLongPress }: Props) {
+  const spreadLabel = entry.kind === 'daily'
+    ? '今日运势'
+    : getSpread(entry.spreadType)?.nameZh ?? '占卜';
   const cardNames = entry.cards
     .map(c => {
       const card = getCard(c.cardId);
@@ -33,6 +37,9 @@ export function HistoryItem({ entry, onPress }: Props) {
   return (
     <Pressable
       onPress={onPress}
+      onLongPress={onLongPress}
+      accessibilityRole="button"
+      accessibilityHint={onLongPress ? '长按可删除此记录' : undefined}
       style={({ pressed }) => [styles.item, pressed && styles.pressed]}
     >
       <View style={styles.headerRow}>

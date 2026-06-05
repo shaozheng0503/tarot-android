@@ -8,7 +8,10 @@ import { HomeScreen } from '../screens/HomeScreen';
 import { ReadingScreen } from '../screens/ReadingScreen';
 import { HistoryScreen } from '../screens/HistoryScreen';
 import { HistoryDetailScreen } from '../screens/HistoryDetailScreen';
-import { colors, fontSize } from '../theme/colors';
+import { DailyScreen } from '../screens/DailyScreen';
+import { CardLibraryScreen } from '../screens/CardLibraryScreen';
+import { CardDetailScreen } from '../screens/CardDetailScreen';
+import { colors } from '../theme/colors';
 import type { RootStackParamList, MainTabParamList } from '../types';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -68,6 +71,14 @@ function MainTabs() {
         }}
       />
       <Tab.Screen
+        name="LibraryTab"
+        component={CardLibraryScreen}
+        options={{
+          title: '图鉴',
+          tabBarIcon: ({ color }) => <TabIcon symbol="❖" color={color} />,
+        }}
+      />
+      <Tab.Screen
         name="HistoryTab"
         component={HistoryScreen}
         options={{
@@ -103,6 +114,16 @@ export function RootNavigator() {
         <Stack.Screen
           name="HistoryDetail"
           component={HistoryDetailScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="Daily"
+          component={DailyScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="CardDetail"
+          component={CardDetailScreen}
           options={{ headerShown: false }}
         />
       </Stack.Navigator>

@@ -49,6 +49,22 @@ export function getSuitColor(suit: string | undefined): string {
   }
 }
 
+// 获取元素颜色(火/水/风/土)
+export function getElementColor(element: string | undefined): string {
+  switch (element) {
+    case '火':
+      return colors.suitWands;
+    case '水':
+      return colors.suitCups;
+    case '风':
+      return colors.suitSwords;
+    case '土':
+      return colors.suitPentacles;
+    default:
+      return colors.gold;
+  }
+}
+
 export const spacing = {
   xs: 4,
   sm: 8,
