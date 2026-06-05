@@ -1,13 +1,15 @@
 // 牌库图鉴:按大阿卡纳 + 四花色分组,浏览全部 78 张牌。
 // 使用轻量静态 chip(不带翻牌动画),点击进入单卡详情。
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { colors, fontSize, radius, spacing, getSuitColor, getElementColor } from '../theme/colors';
 import { CARD_GROUPS } from '../data/cards';
+import { cardGlyph } from '../data/correspondences';
+import { getCardImage } from '../data/cardImages';
 import type { TarotCard, RootStackParamList, MainTabParamList } from '../types';
 
 type Props = CompositeScreenProps<
@@ -44,17 +46,24 @@ export function CardLibraryScreen({ navigation }: Props) {
 
 function CardChip({ card, onPress }: { card: TarotCard; onPress: () => void }) {
   const accent = getSuitColor(card.suit);
+  const image = getCardImage(card.id);
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={`${card.nameZh},元素${card.element}`}
-      style={({ pressed }) => [styles.chip, { borderColor: accent }, pressed && styles.pressed]}
+      style={({ pressed }) => [styles.chip, pressed && styles.pressed]}
     >
-      <View style={[styles.elementDot, { backgroundColor: getElementColor(card.element) }]}>
-        <Text style={styles.elementDotText}>{card.element}</Text>
+      <View style={[styles.thumbWrap, { borderColor: accent }]}>
+        {image ? (
+          <Image source={image} resizeMode="cover" style={styles.thumb} accessible={false} />
+        ) : (
+          <Text style={[styles.chipSymbol, { color: accent }]}>{cardGlyph(card)}</Text>
+        )}
+        <View style={[styles.elementDot, { backgroundColor: getElementColor(card.element) }]}>
+          <Text style={styles.elementDotText}>{card.element}</Text>
+        </View>
       </View>
-      <Text style={[styles.chipSymbol, { color: accent }]}>{card.symbol}</Text>
       <Text style={styles.chipName} numberOfLines={1}>{card.nameZh}</Text>
     </Pressable>
   );
@@ -92,20 +101,29 @@ const styles = StyleSheet.create({
   },
   chip: {
     width: 80,
-    height: 86,
     margin: spacing.xs,
-    borderRadius: radius.md,
+    alignItems: 'center',
+  },
+  pressed: { opacity: 0.65 },
+  thumbWrap: {
+    width: 72,
+    height: 120,
+    borderRadius: radius.sm,
     borderWidth: 1,
     backgroundColor: colors.bgCard,
+    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 4,
+    marginBottom: 4,
   },
-  pressed: { opacity: 0.7, backgroundColor: colors.bgDeep },
+  thumb: {
+    width: '100%',
+    height: '100%',
+  },
   elementDot: {
     position: 'absolute',
-    top: 4,
-    right: 4,
+    top: 3,
+    right: 3,
     width: 16,
     height: 16,
     borderRadius: 8,
@@ -118,11 +136,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   chipSymbol: {
-    fontSize: 26,
-    marginBottom: 4,
-    textShadowColor: colors.bgDeep,
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 6,
+    fontSize: 30,
   },
   chipName: {
     color: colors.textPrimary,

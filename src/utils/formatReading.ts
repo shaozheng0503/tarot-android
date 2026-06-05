@@ -6,6 +6,16 @@ import { getCard } from '../data/cards';
 import { getSpread } from '../data/spreads';
 import { SUIT_ZH } from '../data/correspondences';
 
+/** 粘贴给 AI 时置顶的引导语,让对方直接进入"塔罗师解读"的角色 */
+export const READING_PROMPT =
+  '你是一位经验丰富、温暖而诚实的塔罗师。请结合我的问题,逐张解读下面这个牌阵:' +
+  '留意每张牌的「牌位含义 + 正/逆位 + 元素」在这个问题里意味着什么,' +
+  '说明牌与牌之间如何呼应,最后给出一段整体结论和可执行的建议。语气真诚,不要空泛安慰。';
+
+export const CARD_PROMPT =
+  '你是一位资深塔罗师。请详细讲解下面这张塔罗牌:它的核心象征、正位与逆位的含义差异,' +
+  '以及在感情、事业、个人成长等情境下分别可以怎样解读。';
+
 function pad2(n: number): string {
   return String(n).padStart(2, '0');
 }
@@ -24,10 +34,13 @@ export function cardAstroLabel(cardId: string): string {
 }
 
 /** 图鉴单卡的完整资料(含正逆位),便于单独复制喂给 AI。 */
-export function formatCardText(cardId: string): string {
+export function formatCardText(cardId: string, withPrompt = true): string {
   const card = getCard(cardId);
   if (!card) return '';
   const lines: string[] = [];
+  if (withPrompt) {
+    lines.push(CARD_PROMPT, '');
+  }
   lines.push(`✦ ${card.nameZh} ${card.nameEn}`);
   lines.push(`元素/占星:${cardAstroLabel(cardId)}`);
   lines.push('');
@@ -43,6 +56,8 @@ interface FormatOptions {
   /** 牌阵中文名;不传则按 spreadType 查表 */
   spreadName?: string;
   timestamp?: number;
+  /** 是否在开头加入引导 AI 的角色 prompt(默认 true) */
+  withPrompt?: boolean;
 }
 
 /**
@@ -57,6 +72,9 @@ export function formatReadingText(
   const ts = options.timestamp ?? reading.timestamp;
 
   const lines: string[] = [];
+  if (options.withPrompt !== false) {
+    lines.push(READING_PROMPT, '');
+  }
   lines.push(`✦ 塔罗占卜 · ${spreadName}`);
   if (reading.question) lines.push(`问题:${reading.question}`);
   if (ts) lines.push(`时间:${formatTimestamp(ts)}`);

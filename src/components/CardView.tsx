@@ -1,7 +1,7 @@
 // 牌面 + 牌背:3D 翻牌动画(rotateY 0→180°)
 // 翻牌瞬间附带光晕闪烁(scale + opacity 闪光)
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, ViewStyle, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ViewStyle, Pressable, Image } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -14,6 +14,8 @@ import Animated, {
 import { colors, getSuitColor, radius, fontSize, spacing } from '../theme/colors';
 import type { TarotCard, Orientation } from '../types';
 import { CardBack } from './CardBack';
+import { cardGlyph } from '../data/correspondences';
+import { getCardImage } from '../data/cardImages';
 import { useReduceMotion } from '../hooks/useReduceMotion';
 
 interface Props {
@@ -39,6 +41,11 @@ export function CardView({ card, orientation, faceUp, onPress, small, tiny, styl
   const isReversed = orientation === 'reversed';
   const accent = getSuitColor(card.suit);
   const reduceMotion = useReduceMotion();
+  const glyph = cardGlyph(card);
+  // 小阿卡纳 Ace–10 用花色 pip 点阵呈现(仅正常尺寸,避免小牌拥挤)
+  const showPips = card.arcana === 'minor' && card.number >= 1 && card.number <= 10 && !compact;
+  // 优先使用真实牌图(RWS);缺图则回退到程序化牌面
+  const image = getCardImage(card.id);
 
   const a11yLabel = faceUp
     ? `${card.nameZh},${isReversed ? '逆位' : '正位'},元素${card.element}${card.astro ? `,${card.astro}` : ''}`
@@ -121,13 +128,21 @@ export function CardView({ card, orientation, faceUp, onPress, small, tiny, styl
           <CardBack small={compact} />
         </View>
 
-        {/* 牌面(rotation 180) */}
+        {/* 牌面(rotation 180):优先真实牌图,逆位旋转 180° */}
         <View style={[styles.face, styles.absolute, { transform: [{ rotateY: '180deg' }] }]}>
+          {image ? (
+            <Image
+              source={image}
+              resizeMode="cover"
+              accessible={false}
+              style={[styles.cardImage, { borderColor: accent }, isReversed && styles.reversedImage]}
+            />
+          ) : (
           <View style={[styles.card, { borderColor: accent }]}>
             {/* 顶部条:符号 + 牌名 */}
             <View style={styles.topRow}>
               <Text style={[styles.symbol, compact && styles.symbolSmall, { color: accent }]}>
-                {card.symbol}
+                {glyph}
               </Text>
               <View style={styles.nameWrap}>
                 <Text style={[styles.nameZh, compact && styles.nameZhSmall]} numberOfLines={1}>
@@ -138,7 +153,7 @@ export function CardView({ card, orientation, faceUp, onPress, small, tiny, styl
                 )}
               </View>
               <Text style={[styles.symbol, compact && styles.symbolSmall, { color: accent }]}>
-                {card.symbol}
+                {glyph}
               </Text>
             </View>
 
@@ -147,18 +162,22 @@ export function CardView({ card, orientation, faceUp, onPress, small, tiny, styl
               {card.arcana === 'major' ? card.number : `${card.number}`}
             </Text>
 
-            {/* 中央主符号 */}
+            {/* 中央:小牌花色 pip 点阵 / 其它单字形 */}
             <View style={styles.centerSymbol}>
-              <Text
-                style={[
-                  styles.bigSymbol,
-                  compact && styles.bigSymbolSmall,
-                  tiny && styles.bigSymbolTiny,
-                  { color: accent, textShadowColor: accent },
-                ]}
-              >
-                {card.symbol}
-              </Text>
+              {showPips ? (
+                <MinorPips glyph={glyph} count={card.number} color={accent} />
+              ) : (
+                <Text
+                  style={[
+                    styles.bigSymbol,
+                    compact && styles.bigSymbolSmall,
+                    tiny && styles.bigSymbolTiny,
+                    { color: accent, textShadowColor: accent },
+                  ]}
+                >
+                  {glyph}
+                </Text>
+              )}
             </View>
 
             {/* 元素 / 占星(仅正常尺寸展示,避免小牌拥挤) */}
@@ -175,6 +194,7 @@ export function CardView({ card, orientation, faceUp, onPress, small, tiny, styl
               </Text>
             </View>
           </View>
+          )}
         </View>
 
         {/* 翻牌闪光层(覆盖在牌面之上) */}
@@ -188,6 +208,20 @@ export function CardView({ card, orientation, faceUp, onPress, small, tiny, styl
         />
       </Animated.View>
     </Pressable>
+  );
+}
+
+// 小阿卡纳点阵:Ace 用单个大字形,2–10 排成居中网格
+function MinorPips({ glyph, count, color }: { glyph: string; count: number; color: string }) {
+  if (count === 1) {
+    return <Text style={[styles.pipAce, { color, textShadowColor: color }]}>{glyph}</Text>;
+  }
+  return (
+    <View style={styles.pipGrid}>
+      {Array.from({ length: count }).map((_, i) => (
+        <Text key={i} style={[styles.pip, { color }]}>{glyph}</Text>
+      ))}
+    </View>
   );
 }
 
@@ -208,6 +242,16 @@ const styles = StyleSheet.create({
   flashLayer: {
     backgroundColor: '#fff8e7',
     borderRadius: radius.card,
+  },
+  cardImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: radius.card,
+    borderWidth: 2,
+    backgroundColor: colors.bgCard,
+  },
+  reversedImage: {
+    transform: [{ rotate: '180deg' }],
   },
   card: {
     flex: 1,
@@ -279,6 +323,23 @@ const styles = StyleSheet.create({
   bigSymbolTiny: {
     fontSize: 26,
     textShadowRadius: 6,
+  },
+  pipGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    alignItems: 'center',
+    maxWidth: 100,
+  },
+  pip: {
+    fontSize: 20,
+    marginHorizontal: 2,
+    marginVertical: 1,
+  },
+  pipAce: {
+    fontSize: 56,
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 12,
   },
   astro: {
     fontSize: 10,

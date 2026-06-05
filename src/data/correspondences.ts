@@ -1,7 +1,7 @@
 // 元素与占星对应表
 // 大阿卡纳:Golden Dawn 体系的行星/星座归属
 // 小阿卡纳:由花色推导元素(权杖火/圣杯水/宝剑风/星币土)
-import type { Element, Suit } from '../types';
+import type { Element, Suit, TarotCard } from '../types';
 
 /** 花色 → 元素 */
 export const SUIT_ELEMENT: Record<Suit, Element> = {
@@ -10,6 +10,19 @@ export const SUIT_ELEMENT: Record<Suit, Element> = {
   swords: '风',
   pentacles: '土',
 };
+
+/** 花色 → 牌面字形(沿用塔罗小牌与扑克花色的历史对应,字体支持稳定) */
+export const SUIT_GLYPH: Record<Suit, string> = {
+  wands: '♣',
+  cups: '♥',
+  swords: '♠',
+  pentacles: '♦',
+};
+
+/** 牌面主字形:大阿卡纳用行星/星座符号,小阿卡纳用花色字形 */
+export function cardGlyph(card: TarotCard): string {
+  return card.arcana === 'major' ? card.symbol : SUIT_GLYPH[card.suit as Suit];
+}
 
 /** 花色 → 中文名 */
 export const SUIT_ZH: Record<Suit, string> = {
