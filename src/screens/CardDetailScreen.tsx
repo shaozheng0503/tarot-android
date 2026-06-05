@@ -1,10 +1,11 @@
 // 单卡详情:大牌面 + 元素占星 + 正位/逆位完整释义 + 一键复制。
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, Pressable } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Pressable, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { colors, fontSize, radius, spacing, getElementColor } from '../theme/colors';
+import { colors, fontSize, radius, spacing, getElementColor, getSuitColor } from '../theme/colors';
 import { getCard } from '../data/cards';
+import { getCardImage } from '../data/cardImages';
 import { SUIT_ZH, ELEMENT_NATURE } from '../data/correspondences';
 import { formatCardText } from '../utils/formatReading';
 import { CardView } from '../components/CardView';
@@ -34,6 +35,7 @@ export function CardDetailScreen({ route, navigation }: Props) {
 
   const astroTail = card.astro || (card.suit ? SUIT_ZH[card.suit] : '');
   const elementColor = getElementColor(card.element);
+  const image = getCardImage(card.id);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -47,7 +49,16 @@ export function CardDetailScreen({ route, navigation }: Props) {
 
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={styles.cardWrap}>
-          <CardView card={card} orientation="upright" faceUp />
+          {image ? (
+            <Image
+              source={image}
+              resizeMode="contain"
+              accessibilityLabel={`${card.nameZh} 牌面`}
+              style={[styles.heroImage, { borderColor: getSuitColor(card.suit) }]}
+            />
+          ) : (
+            <CardView card={card} orientation="upright" faceUp />
+          )}
         </View>
 
         <Text style={styles.nameEn}>{card.nameEn}</Text>
@@ -114,6 +125,18 @@ const styles = StyleSheet.create({
   headerSpacer: { width: 50 },
   scroll: { padding: spacing.lg, paddingBottom: spacing.xxl },
   cardWrap: { alignItems: 'center', marginBottom: spacing.sm },
+  heroImage: {
+    width: 210,
+    height: 360,
+    borderRadius: radius.card,
+    borderWidth: 2,
+    backgroundColor: colors.bgCard,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.5,
+    shadowRadius: 12,
+    elevation: 10,
+  },
   nameEn: {
     color: colors.textMuted,
     fontSize: fontSize.caption,
