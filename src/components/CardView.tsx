@@ -1,12 +1,11 @@
-// 牌面 + 牌背:3D 翻牌动画(rotateY 0→180°)
-// 翻牌瞬间附带光晕闪烁(scale + opacity 闪光)
-import React, { useEffect } from 'react';
+// 牌面 + 牌背:绕竖轴的 scaleX 翻牌(不依赖 backfaceVisibility,真图必定显示)。
+// 翻到侧立(scaleX≈0)的瞬间切换正/反面内容,因此永远不会看到镜像或被裁掉的正面。
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ViewStyle, Pressable, Image } from 'react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
-  withSequence,
   withDelay,
   Easing,
   withSpring,
@@ -34,80 +33,66 @@ interface Props {
 const NORMAL = { w: 120, h: 200 };
 const SMALL = { w: 80, h: 130 };
 const TINY = { w: 62, h: 102 };
+const HALF_MS = 230; // 翻到侧立用时(总翻牌 ≈ 2×)
 
 export function CardView({ card, orientation, faceUp, onPress, small, tiny, style, flipDelay = 0 }: Props) {
   const dim = tiny ? TINY : small ? SMALL : NORMAL;
   const compact = small || tiny;
   const isReversed = orientation === 'reversed';
   const accent = getSuitColor(card.suit);
-  const reduceMotion = useReduceMotion();
   const glyph = cardGlyph(card);
-  // 小阿卡纳 Ace–10 用花色 pip 点阵呈现(仅正常尺寸,避免小牌拥挤)
   const showPips = card.arcana === 'minor' && card.number >= 1 && card.number <= 10 && !compact;
-  // 优先使用真实牌图(RWS);缺图则回退到程序化牌面
   const image = getCardImage(card.id);
+  const reduceMotion = useReduceMotion();
 
   const a11yLabel = faceUp
     ? `${card.nameZh},${isReversed ? '逆位' : '正位'},元素${card.element}${card.astro ? `,${card.astro}` : ''}`
     : '未翻开的塔罗牌';
 
-  // 翻牌角度:0 = 牌背,180 = 牌面
-  const rotation = useSharedValue(faceUp ? 180 : 0);
-  // 闪光效果:翻牌瞬间 0 → 1 → 0
-  const flash = useSharedValue(0);
-  // 入场:scale 0.6 → 1
+  // showFront: 当前显示正面还是牌背(在翻牌侧立瞬间切换)
+  const [showFront, setShowFront] = useState(faceUp);
+  const flip = useSharedValue(faceUp ? 1 : 0); // 0=背面朝前,1=正面朝前
   const appear = useSharedValue(0);
 
+  // 入场动画
   useEffect(() => {
-    // 入场动画(减少动效时直接到位)
-    if (reduceMotion) {
-      appear.value = 1;
-      return;
-    }
-    appear.value = withDelay(
-      flipDelay,
-      withSpring(1, { damping: 12, stiffness: 180, mass: 0.6 }),
-    );
+    if (reduceMotion) { appear.value = 1; return; }
+    appear.value = withDelay(flipDelay, withSpring(1, { damping: 12, stiffness: 180, mass: 0.6 }));
   }, [flipDelay, appear, reduceMotion]);
 
+  // 翻牌:scaleX 1→0→1,到 0(侧立)时切换正反面内容
   useEffect(() => {
-    // 减少动效:直接定位,不播放翻牌与闪光
     if (reduceMotion) {
-      rotation.value = faceUp ? 180 : 0;
-      flash.value = 0;
+      flip.value = faceUp ? 1 : 0;
+      setShowFront(faceUp);
       return;
     }
+    let timer: ReturnType<typeof setTimeout> | undefined;
     if (faceUp) {
-      // 翻牌(延迟以错开)
-      rotation.value = withDelay(
-        flipDelay,
-        withTiming(180, { duration: 800, easing: Easing.inOut(Easing.cubic) }),
-      );
-      // 翻完瞬间闪光
-      flash.value = withDelay(
-        flipDelay + 400,
-        withSequence(
-          withTiming(1, { duration: 250, easing: Easing.out(Easing.cubic) }),
-          withTiming(0, { duration: 500, easing: Easing.in(Easing.cubic) }),
-        ),
-      );
+      flip.value = withDelay(flipDelay, withTiming(1, {
+        duration: HALF_MS * 2,
+        easing: Easing.inOut(Easing.cubic),
+      }));
+      timer = setTimeout(() => setShowFront(true), flipDelay + HALF_MS);
     } else {
-      rotation.value = withTiming(0, { duration: 400 });
+      flip.value = withTiming(0, { duration: HALF_MS * 2, easing: Easing.inOut(Easing.cubic) });
+      timer = setTimeout(() => setShowFront(false), HALF_MS);
     }
-  }, [faceUp, flipDelay, rotation, flash, reduceMotion]);
+    return () => { if (timer) clearTimeout(timer); };
+  }, [faceUp, flipDelay, flip, reduceMotion]);
 
-  const wrapperStyle = useAnimatedStyle(() => ({
-    transform: [
-      { perspective: 1200 },
-      { rotateY: `${rotation.value}deg` },
-      { scale: 0.85 + appear.value * 0.15 },
-    ],
-    opacity: appear.value,
-  }));
-
-  const flashStyle = useAnimatedStyle(() => ({
-    opacity: flash.value * 0.35,
-  }));
+  const animStyle = useAnimatedStyle(() => {
+    // scaleX = |cos(flip·π)|:flip 0 或 1 时为 1(正对),0.5 时为 0(侧立)
+    const sx = Math.abs(Math.cos(flip.value * Math.PI));
+    return {
+      opacity: appear.value,
+      transform: [
+        { perspective: 900 },
+        { scale: 0.9 + appear.value * 0.1 },
+        { scaleX: Math.max(0.002, sx) },
+      ],
+    };
+  });
 
   return (
     <Pressable
@@ -122,15 +107,9 @@ export function CardView({ card, orientation, faceUp, onPress, small, tiny, styl
         style,
       ]}
     >
-      <Animated.View style={[styles.flipWrap, { width: dim.w, height: dim.h }, wrapperStyle]}>
-        {/* 牌背(rotation 0):填满槽位,与正面尺寸一致,翻牌才对得齐 */}
-        <View style={[styles.face, styles.absolute]}>
-          <CardBack small={compact} style={styles.fillSize} />
-        </View>
-
-        {/* 牌面(rotation 180):优先真实牌图,逆位旋转 180° */}
-        <View style={[styles.face, styles.absolute, { transform: [{ rotateY: '180deg' }] }]}>
-          {image ? (
+      <Animated.View style={[{ width: dim.w, height: dim.h }, animStyle]}>
+        {showFront ? (
+          image ? (
             <Image
               source={image}
               resizeMode="cover"
@@ -138,74 +117,40 @@ export function CardView({ card, orientation, faceUp, onPress, small, tiny, styl
               style={[styles.cardImage, { borderColor: accent }, isReversed && styles.reversedImage]}
             />
           ) : (
-          <View style={[styles.card, { borderColor: accent }]}>
-            {/* 顶部条:符号 + 牌名 */}
-            <View style={styles.topRow}>
-              <Text style={[styles.symbol, compact && styles.symbolSmall, { color: accent }]}>
-                {glyph}
+            <View style={[styles.card, { borderColor: accent }]}>
+              <View style={styles.topRow}>
+                <Text style={[styles.symbol, compact && styles.symbolSmall, { color: accent }]}>{glyph}</Text>
+                <View style={styles.nameWrap}>
+                  <Text style={[styles.nameZh, compact && styles.nameZhSmall]} numberOfLines={1}>{card.nameZh}</Text>
+                  {!compact && <Text style={styles.nameEn} numberOfLines={1}>{card.nameEn}</Text>}
+                </View>
+                <Text style={[styles.symbol, compact && styles.symbolSmall, { color: accent }]}>{glyph}</Text>
+              </View>
+              <Text style={[styles.number, compact && styles.numberSmall, { color: accent }]}>
+                {card.arcana === 'major' ? card.number : `${card.number}`}
               </Text>
-              <View style={styles.nameWrap}>
-                <Text style={[styles.nameZh, compact && styles.nameZhSmall]} numberOfLines={1}>
-                  {card.nameZh}
-                </Text>
-                {!compact && (
-                  <Text style={styles.nameEn} numberOfLines={1}>{card.nameEn}</Text>
+              <View style={styles.centerSymbol}>
+                {showPips ? (
+                  <MinorPips glyph={glyph} count={card.number} color={accent} />
+                ) : (
+                  <Text style={[styles.bigSymbol, compact && styles.bigSymbolSmall, tiny && styles.bigSymbolTiny, { color: accent, textShadowColor: accent }]}>{glyph}</Text>
                 )}
               </View>
-              <Text style={[styles.symbol, compact && styles.symbolSmall, { color: accent }]}>
-                {glyph}
-              </Text>
-            </View>
-
-            {/* 牌号 */}
-            <Text style={[styles.number, compact && styles.numberSmall, { color: accent }]}>
-              {card.arcana === 'major' ? card.number : `${card.number}`}
-            </Text>
-
-            {/* 中央:小牌花色 pip 点阵 / 其它单字形 */}
-            <View style={styles.centerSymbol}>
-              {showPips ? (
-                <MinorPips glyph={glyph} count={card.number} color={accent} />
-              ) : (
-                <Text
-                  style={[
-                    styles.bigSymbol,
-                    compact && styles.bigSymbolSmall,
-                    tiny && styles.bigSymbolTiny,
-                    { color: accent, textShadowColor: accent },
-                  ]}
-                >
-                  {glyph}
+              {!compact && (
+                <Text style={[styles.astro, { color: accent }]} numberOfLines={1}>
+                  {card.element}{card.astro ? ` · ${card.astro}` : ''}
                 </Text>
               )}
+              <View style={styles.bottomRow}>
+                <Text style={[styles.orientation, isReversed && { color: colors.reversed }]}>
+                  {isReversed ? '✦ 逆位 ✦' : '✦ 正位 ✦'}
+                </Text>
+              </View>
             </View>
-
-            {/* 元素 / 占星(仅正常尺寸展示,避免小牌拥挤) */}
-            {!compact && (
-              <Text style={[styles.astro, { color: accent }]} numberOfLines={1}>
-                {card.element}{card.astro ? ` · ${card.astro}` : ''}
-              </Text>
-            )}
-
-            {/* 底部条:正/逆位标记 */}
-            <View style={styles.bottomRow}>
-              <Text style={[styles.orientation, isReversed && { color: colors.reversed }]}>
-                {isReversed ? '✦ 逆位 ✦' : '✦ 正位 ✦'}
-              </Text>
-            </View>
-          </View>
-          )}
-        </View>
-
-        {/* 翻牌闪光层(覆盖在牌面之上) */}
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            styles.absolute,
-            styles.flashLayer,
-            flashStyle,
-          ]}
-        />
+          )
+        ) : (
+          <CardBack small={compact} style={styles.fillSize} />
+        )}
       </Animated.View>
     </Pressable>
   );
@@ -226,26 +171,9 @@ function MinorPips({ glyph, count, color }: { glyph: string; count: number; colo
 }
 
 const styles = StyleSheet.create({
-  flipWrap: {
-    position: 'relative',
-  },
   fillSize: {
     width: '100%',
     height: '100%',
-  },
-  face: {
-    backfaceVisibility: 'hidden',
-  },
-  absolute: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-  },
-  flashLayer: {
-    backgroundColor: '#fff8e7',
-    borderRadius: radius.card,
   },
   cardImage: {
     width: '100%',
@@ -258,7 +186,6 @@ const styles = StyleSheet.create({
     transform: [{ rotate: '180deg' }],
   },
   card: {
-    flex: 1,
     width: '100%',
     height: '100%',
     backgroundColor: colors.bgCard,
