@@ -2,6 +2,7 @@ import { shuffle, rollOrientation, REVERSED_PROBABILITY } from '../src/utils/shu
 import { getDailyDraw, dateKey, hashString } from '../src/utils/dailyCard';
 import { formatReadingText, formatCardText } from '../src/utils/formatReading';
 import { ALL_CARDS, CARDS_BY_ID, getCard, CARD_GROUPS } from '../src/data/cards';
+import { getCardImage } from '../src/data/cardImages';
 
 describe('shuffle', () => {
   it('保留所有元素且不改变原数组', () => {
@@ -101,5 +102,13 @@ describe('图鉴分组', () => {
     expect(total).toBe(ALL_CARDS.length);
     expect(ALL_CARDS.length).toBe(78);
     expect(CARD_GROUPS).toHaveLength(5);
+  });
+});
+
+describe('真实牌图覆盖', () => {
+  it('每一张牌都有对应牌图(不会退回程序化牌面)', () => {
+    for (const card of ALL_CARDS) {
+      expect(getCardImage(card.id)).toBeTruthy();
+    }
   });
 });
