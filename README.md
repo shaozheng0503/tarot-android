@@ -16,6 +16,7 @@
 ![New Architecture](https://img.shields.io/badge/New_Arch_+_Hermes-on-8a6dff)
 ![License](https://img.shields.io/badge/license-MIT-yellow)
 
+[![Release](https://img.shields.io/github/v/release/shaozheng0503/tarot-android?color=c9a227&label=下载&logo=android&logoColor=white)](https://github.com/shaozheng0503/tarot-android/releases/latest)
 ![Cards](https://img.shields.io/badge/🃏_牌库-78_张-c9a227)
 ![Spreads](https://img.shields.io/badge/🔮_牌阵-6_种-c9a227)
 ![Tests](https://img.shields.io/badge/✓_tests-19_passing-4caf50)
@@ -144,19 +145,20 @@
 
 ## 📲 下载与安装
 
-目前以本地构建为主(见 [本地运行与构建](#-本地运行与构建))。构建产物为按 ABI 分包的 release APK:
+前往 [**Releases**](https://github.com/shaozheng0503/tarot-android/releases/latest) 下载最新 APK:
 
 | APK | 适用 |
 |---|---|
-| `app-arm64-v8a-release.apk` | ⭐ 绝大多数现代手机(2017 年后) |
-| `app-universal-release.apk` | 通用包,任何设备 / 模拟器 |
+| [**tarot-arm64-v8a.apk**](https://github.com/shaozheng0503/tarot-android/releases/latest) | ⭐ 绝大多数现代手机(2017 年后) |
+| [tarot-universal.apk](https://github.com/shaozheng0503/tarot-android/releases/latest) | 通用包,任何设备 / 模拟器 |
 
 安装:
 ```bash
-adb install -r app-arm64-v8a-release.apk
+adb install -r tarot-v0.5.0-arm64-v8a.apk
 # 或:手机上开启「未知来源」后点开 APK 安装
 ```
 
+> 也可自行构建,见 [本地运行与构建](#-本地运行与构建)。
 > release 包以 debug key 签名,**自用 / 学习 / 侧载无虞**;上架应用商店需替换为正式 keystore。
 
 ---
