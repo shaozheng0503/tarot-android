@@ -106,7 +106,7 @@ export function CardView({ card, orientation, faceUp, onPress, small, tiny, styl
   }));
 
   const flashStyle = useAnimatedStyle(() => ({
-    opacity: flash.value * 0.85,
+    opacity: flash.value * 0.35,
   }));
 
   return (
@@ -123,9 +123,9 @@ export function CardView({ card, orientation, faceUp, onPress, small, tiny, styl
       ]}
     >
       <Animated.View style={[styles.flipWrap, { width: dim.w, height: dim.h }, wrapperStyle]}>
-        {/* 牌背(rotation 0) */}
+        {/* 牌背(rotation 0):填满槽位,与正面尺寸一致,翻牌才对得齐 */}
         <View style={[styles.face, styles.absolute]}>
-          <CardBack small={compact} />
+          <CardBack small={compact} style={styles.fillSize} />
         </View>
 
         {/* 牌面(rotation 180):优先真实牌图,逆位旋转 180° */}
@@ -228,6 +228,10 @@ function MinorPips({ glyph, count, color }: { glyph: string; count: number; colo
 const styles = StyleSheet.create({
   flipWrap: {
     position: 'relative',
+  },
+  fillSize: {
+    width: '100%',
+    height: '100%',
   },
   face: {
     backfaceVisibility: 'hidden',
