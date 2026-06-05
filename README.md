@@ -64,15 +64,30 @@
 
 ## 📸 截图
 
-<div align="center">
+<table align="center">
+  <tr>
+    <td align="center" width="50%">
+      <img src="docs/screenshots/home.jpg" width="240" alt="首页" /><br/>
+      <sub>🏠 <b>首页</b> · 今日运势 + 6 种牌阵</sub>
+    </td>
+    <td align="center" width="50%">
+      <img src="docs/screenshots/reading.jpg" width="240" alt="凯尔特十字" /><br/>
+      <sub>🔮 <b>凯尔特十字</b> · 10 张真实牌图(含逆位)</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="50%">
+      <img src="docs/screenshots/library.jpg" width="240" alt="牌库图鉴" /><br/>
+      <sub>📖 <b>牌库图鉴</b> · 78 张真图 + 元素角标</sub>
+    </td>
+    <td align="center" width="50%">
+      <img src="docs/screenshots/card-detail.jpg" width="240" alt="单卡详情" /><br/>
+      <sub>🃏 <b>单卡详情</b> · 正逆位完整释义,可单独复制</sub>
+    </td>
+  </tr>
+</table>
 
-<img src="docs/screenshots/reading.png" width="300" alt="三牌阵解读" />
-
-<sub>三牌阵 · 过去 / 现在 / 未来 —— 每张牌带元素、占星、关键词与释义</sub>
-
-</div>
-
-> 💡 想补齐更多截图?在新版 App 上截图后,把文件丢进 `docs/screenshots/`(建议命名 `home.png` / `library.png` / `daily.png` / `card-detail.png`),README 会自动展示。
+<div align="center"><sub>📱 真机实拍 · Rider-Waite-Smith 经典牌面</sub></div>
 
 ---
 
